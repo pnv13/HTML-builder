@@ -2,6 +2,8 @@ const fs = require('fs');
 const path = require('path');
 
 const pathForBuild = path.join(__dirname, 'project-dist');
+const assets = path.join(__dirname, 'assets');
+const assetsBuild = path.join(pathForBuild, 'assets');
 const cssComponents = path.join(__dirname, 'styles');
 const htmlComponents = path.join(__dirname, 'components');
 
@@ -14,6 +16,44 @@ const distCreator = () => {
 const createAssets = () => {
   fs.mkdir(path.join(pathForBuild, 'assets'), { recursive: true }, err => {
     if (err) throw new Error('assets is can not be created');
+  });
+};
+
+const checkCopyFolder = () => {
+  fs.readdir(assetsBuild, (err, folders) => {
+    if (err) return;
+
+    folders.forEach(folder => {
+      fs.access(path.join(assets, folder), err => {
+        if (err) {
+          fs.rmdir(path.join(assetsBuild, folder), deletingErr => {
+            if (deletingErr) throw new Error(`Error with deleting folder: ${folder}`);
+          });
+        }
+      });
+    });
+  });
+};
+
+const checkCopyFiles = () => {
+  fs.readdir(assetsBuild, (err, folders) => {
+    if (err) throw new Error('Error with read folders');
+
+    folders.forEach(folder => {
+      fs.readdir(path.join(assetsBuild, folder), (err, files) => {
+        if (err) throw new Error('Error with reading files');
+
+        files.forEach(file => {
+          fs.access(path.join(assets, folder, file), err => {
+            if (err) {
+              fs.unlink(path.join(assetsBuild, folder, file), deletingErr => {
+                if (deletingErr) throw new Error(`Error with deleting file: ${file}`);
+              });
+            }
+          });
+        });
+      });
+    });
   });
 };
 
@@ -80,6 +120,8 @@ const htmlBuilder = () => {
 const build = async () => {
   await distCreator();
   await createAssets();
+  await checkCopyFolder();
+  await checkCopyFiles();
   await copyAssetsFoldersAndFiles();
   await cssBuilder();
   await htmlBuilder();

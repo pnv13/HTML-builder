@@ -5,7 +5,7 @@ const { stdout, stdin } = require('process');
 const fullPath = path.join(__dirname, 'text.txt');
 const textFile = fs.createWriteStream(fullPath);
 
-stdout.write('Hi all, write some text: ');
+stdout.write('Hi all, write some text: \n');
 process.on('SIGINT', () => process.exit());
 stdin.on('data', data => {
   const enterData = data.toString();
