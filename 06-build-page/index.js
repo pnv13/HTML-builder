@@ -24,10 +24,26 @@ const checkCopyFolder = () => {
     if (err) return;
 
     folders.forEach(folder => {
-      fs.access(path.join(assets, folder), err => {
-        if (err) {
-          fs.rmdir(path.join(assetsBuild, folder), deletingErr => {
-            if (deletingErr) throw new Error(`Error with deleting folder: ${folder}`);
+      fs.stat(path.join(assetsBuild, folder), (errInfo, stats) => {
+        if (errInfo) throw new Error(`Error with getting info in ${stats}`);
+
+        if (stats.isDirectory()) {
+          fs.access(path.join(assets, folder), err => {
+            if (err) {
+              fs.rmdir(path.join(assetsBuild, folder), deletingErr => {
+                if (deletingErr) throw new Error(`Error with deleting folder: ${folder}`);
+              });
+            }
+          });
+        } else if (stats.isFile()) {
+          fs.access(path.join(assets, folder), err => {
+            if (err) {
+              fs.unlink(path.join(assetsBuild, folder), deletingErr => {
+                if (err) {
+                  if (deletingErr) throw new Error(`Error with deleting file: ${folder}`);
+                }
+              });
+            }
           });
         }
       });
@@ -40,18 +56,24 @@ const checkCopyFiles = () => {
     if (err) throw new Error('Error with read folders');
 
     folders.forEach(folder => {
-      fs.readdir(path.join(assetsBuild, folder), (err, files) => {
-        if (err) throw new Error('Error with reading files');
+      fs.stat(path.join(assetsBuild, folder), (errInfo, stats) => {
+        if (errInfo) throw new Error('Error with getting stats');
 
-        files.forEach(file => {
-          fs.access(path.join(assets, folder, file), err => {
-            if (err) {
-              fs.unlink(path.join(assetsBuild, folder, file), deletingErr => {
-                if (deletingErr) throw new Error(`Error with deleting file: ${file}`);
+        if (stats.isDirectory()) {
+          fs.readdir(path.join(assetsBuild, folder), (err, files) => {
+            if (err) throw new Error('Error with reading files');
+
+            files.forEach(file => {
+              fs.access(path.join(assets, folder, file), err => {
+                if (err) {
+                  fs.unlink(path.join(assetsBuild, folder, file), deletingErr => {
+                    if (deletingErr) throw new Error(`Error with deleting file: ${file}`);
+                  });
+                }
               });
-            }
+            });
           });
-        });
+        }
       });
     });
   });
@@ -64,19 +86,29 @@ const copyAssetsFoldersAndFiles = () => {
     folders.forEach(folder => {
       const assetsBuildFolder = path.join(pathForBuild, 'assets', folder);
 
-      fs.mkdir(assetsBuildFolder, { recursive: true }, err => {
-        if (err) throw new Error(`Folder: ${folder}, can not be created`);
-      });
+      fs.stat(path.join(__dirname, 'assets', folder), (errInfo, stats) => {
+        if (errInfo) throw new Error(`Can not get errInfo in ${stats}`);
 
-      const assetsReadFolder = path.join(__dirname, 'assets', folder);
+        if (stats.isDirectory()) {
+          fs.mkdir(assetsBuildFolder, { recursive: true }, err => {
+            if (err) throw new Error(`Folder: ${folder}, can not be created`);
 
-      fs.readdir(assetsReadFolder, (err, files) => {
-        if (err) throw new Error('Can not read files');
-        files.forEach(file => {
-          const readStream = fs.createReadStream(path.join(assetsReadFolder, file));
-          const writeStream = fs.createWriteStream(path.join(assetsBuildFolder, file));
+            const assetsReadFolder = path.join(__dirname, 'assets', folder);
+
+            fs.readdir(assetsReadFolder, (err, files) => {
+              if (err) throw new Error('Can not read files');
+              files.forEach(file => {
+                const readStream = fs.createReadStream(path.join(assetsReadFolder, file));
+                const writeStream = fs.createWriteStream(path.join(assetsBuildFolder, file));
+                readStream.pipe(writeStream);
+              });
+            });
+          });
+        } else if (stats.isFile()) {
+          const readStream = fs.createReadStream(path.join(__dirname, 'assets', folder));
+          const writeStream = fs.createWriteStream(assetsBuildFolder);
           readStream.pipe(writeStream);
-        });
+        }
       });
     });
   });
