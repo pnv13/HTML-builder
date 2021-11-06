@@ -30,7 +30,7 @@ const checkCopyFolder = () => {
         if (stats.isDirectory()) {
           fs.access(path.join(assets, folder), err => {
             if (err) {
-              fs.rmdir(path.join(assetsBuild, folder), deletingErr => {
+              fs.rm(path.join(assetsBuild, folder), { recursive: true }, deletingErr => {
                 if (deletingErr) throw new Error(`Error with deleting folder: ${folder}`);
               });
             }
