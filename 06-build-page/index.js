@@ -91,18 +91,23 @@ const htmlBuilder = () => {
 
     fs.readdir(htmlComponents, (err, files) => {
       if (err) throw new Error('Error with read components');
+      const htmlFiles = files.filter(file => path.extname(file) === '.html');
 
-      files.forEach(file => {
+      htmlFiles.forEach(async file => {
         const fileInfo = path.parse(file);
         if (data.includes(fileInfo.name)) {
-          fs.readFile(path.join(htmlComponents, file), 'utf8', (errComponent, dataComponent) => {
-            if (errComponent) throw new Error('Error with reading component');
+          await fs.readFile(
+            path.join(htmlComponents, file),
+            'utf8',
+            (errComponent, dataComponent) => {
+              if (errComponent) throw new Error('Error with reading component');
 
-            data = data.replaceAll(`{{${fileInfo.name}}}`, dataComponent);
-            fs.writeFile(path.join(pathForBuild, 'index.html'), data, err => {
-              if (err) throw new Error('Error with write data');
-            });
-          });
+              data = data.replaceAll(`{{${fileInfo.name}}}`, dataComponent);
+              fs.writeFile(path.join(pathForBuild, 'index.html'), data, err => {
+                if (err) throw new Error('Error with write data');
+              });
+            }
+          );
         }
       });
     });
