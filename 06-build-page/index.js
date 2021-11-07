@@ -19,95 +19,55 @@ const createAssets = () => {
   });
 };
 
-const checkCopyFolder = () => {
-  fs.readdir(assetsBuild, (err, folders) => {
-    if (err) return;
+const checkAssetsFoldersAndFiles = (assets, assetsBuild) => {
+  fs.mkdir(assetsBuild, { recursive: true }, err => {
+    if (err) throw new Error('Folder is created');
 
-    folders.forEach(folder => {
-      fs.stat(path.join(assetsBuild, folder), (errInfo, stats) => {
-        if (errInfo) throw new Error(`Error with getting info in ${stats}`);
+    fs.readdir(assetsBuild, (errFiles, files) => {
+      if (errFiles) throw new Error(`Error with reading files in ${assetsBuild}`);
 
-        if (stats.isDirectory()) {
-          fs.access(path.join(assets, folder), err => {
-            if (err) {
-              fs.rm(path.join(assetsBuild, folder), { recursive: true }, deletingErr => {
-                if (deletingErr) throw new Error(`Error with deleting folder: ${folder}`);
-              });
-            }
-          });
-        } else if (stats.isFile()) {
-          fs.access(path.join(assets, folder), err => {
-            if (err) {
-              fs.unlink(path.join(assetsBuild, folder), deletingErr => {
-                if (err) {
-                  if (deletingErr) throw new Error(`Error with deleting file: ${folder}`);
-                }
-              });
-            }
-          });
-        }
+      files.forEach(file => {
+        fs.stat(path.join(assetsBuild, file), (errInfo, stats) => {
+          if (errInfo) throw new Error(`Error with ${stats}`);
+
+          if (stats.isFile()) {
+            fs.access(path.join(assets, file), err => {
+              if (err) {
+                fs.unlink(path.join(assetsBuild, file), deletingErr => {
+                  if (deletingErr) throw new Error(`Error with deleting file: ${file}`);
+                });
+              }
+            });
+          } else if (stats.isDirectory()) {
+            fs.access(path.join(assets, file), err => {
+              if (err) {
+                fs.rm(path.join(assetsBuild, file), { recursive: true }, deletingErr => {
+                  if (deletingErr) throw new Error(`Error with deleting file: ${file}`);
+                });
+              }
+            });
+          }
+        });
       });
     });
   });
 };
 
-const checkCopyFiles = () => {
-  fs.readdir(assetsBuild, (err, folders) => {
-    if (err) throw new Error('Error with read folders');
+const copyAssetsFoldersAndFiles = (assets, assetsBuild) => {
+  fs.readdir(assets, (err, files) => {
+    if (err) throw new Error('Error with file');
 
-    folders.forEach(folder => {
-      fs.stat(path.join(assetsBuild, folder), (errInfo, stats) => {
-        if (errInfo) throw new Error('Error with getting stats');
+    files.forEach(file => {
+      fs.stat(path.join(assets, file), (errInfo, stats) => {
+        if (errInfo) throw new Error(`Error with ${stats}`);
 
-        if (stats.isDirectory()) {
-          fs.readdir(path.join(assetsBuild, folder), (err, files) => {
-            if (err) throw new Error('Error with reading files');
-
-            files.forEach(file => {
-              fs.access(path.join(assets, folder, file), err => {
-                if (err) {
-                  fs.unlink(path.join(assetsBuild, folder, file), deletingErr => {
-                    if (deletingErr) throw new Error(`Error with deleting file: ${file}`);
-                  });
-                }
-              });
-            });
-          });
-        }
-      });
-    });
-  });
-};
-
-const copyAssetsFoldersAndFiles = () => {
-  fs.readdir(path.join(__dirname, 'assets'), (err, folders) => {
-    if (err) throw new Error('Can not read assets');
-
-    folders.forEach(folder => {
-      const assetsBuildFolder = path.join(pathForBuild, 'assets', folder);
-
-      fs.stat(path.join(__dirname, 'assets', folder), (errInfo, stats) => {
-        if (errInfo) throw new Error(`Can not get errInfo in ${stats}`);
-
-        if (stats.isDirectory()) {
-          fs.mkdir(assetsBuildFolder, { recursive: true }, err => {
-            if (err) throw new Error(`Folder: ${folder}, can not be created`);
-
-            const assetsReadFolder = path.join(__dirname, 'assets', folder);
-
-            fs.readdir(assetsReadFolder, (err, files) => {
-              if (err) throw new Error('Can not read files');
-              files.forEach(file => {
-                const readStream = fs.createReadStream(path.join(assetsReadFolder, file));
-                const writeStream = fs.createWriteStream(path.join(assetsBuildFolder, file));
-                readStream.pipe(writeStream);
-              });
-            });
-          });
-        } else if (stats.isFile()) {
-          const readStream = fs.createReadStream(path.join(__dirname, 'assets', folder));
-          const writeStream = fs.createWriteStream(assetsBuildFolder);
+        if (stats.isFile()) {
+          const readStream = fs.createReadStream(path.join(assets, file));
+          const writeStream = fs.createWriteStream(path.join(assetsBuild, file));
           readStream.pipe(writeStream);
+        } else if (stats.isDirectory()) {
+          checkAssetsFoldersAndFiles(path.join(assets, file), path.join(assetsBuild, file));
+          copyAssetsFoldersAndFiles(path.join(assets, file), path.join(assetsBuild, file));
         }
       });
     });
@@ -126,21 +86,21 @@ const cssBuilder = () => {
 };
 
 const htmlBuilder = () => {
-  const readStream = fs.createReadStream(path.join(__dirname, 'template.html'));
+  fs.readFile(path.join(__dirname, 'template.html'), 'utf8', (errReading, data) => {
+    if (errReading) throw new Error('Error with reading file');
 
-  readStream.on('data', chunk => {
     fs.readdir(htmlComponents, (err, files) => {
       if (err) throw new Error('Error with read components');
 
       files.forEach(file => {
         const fileInfo = path.parse(file);
-        if (chunk.toString().includes(fileInfo.name)) {
-          const componentReadStream = fs.createReadStream(path.join(htmlComponents, file));
+        if (data.includes(fileInfo.name)) {
+          fs.readFile(path.join(htmlComponents, file), 'utf8', (errComponent, dataComponent) => {
+            if (errComponent) throw new Error('Error with reading component');
 
-          componentReadStream.on('data', content => {
-            chunk = chunk.toString().replaceAll(`{{${fileInfo.name}}}`, content);
-            fs.writeFile(path.join(pathForBuild, 'index.html'), chunk, err => {
-              if (err) throw new Error('Error with write chunk');
+            data = data.replaceAll(`{{${fileInfo.name}}}`, dataComponent);
+            fs.writeFile(path.join(pathForBuild, 'index.html'), data, err => {
+              if (err) throw new Error('Error with write data');
             });
           });
         }
@@ -152,9 +112,8 @@ const htmlBuilder = () => {
 const build = async () => {
   await distCreator();
   await createAssets();
-  await checkCopyFolder();
-  await checkCopyFiles();
-  await copyAssetsFoldersAndFiles();
+  await checkAssetsFoldersAndFiles(assets, assetsBuild);
+  await copyAssetsFoldersAndFiles(assets, assetsBuild);
   await cssBuilder();
   await htmlBuilder();
 };
